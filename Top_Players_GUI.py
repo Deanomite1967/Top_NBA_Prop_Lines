@@ -119,15 +119,16 @@ def stat_chart(df, stat, line_value):
     y_max = max_val * 1.2
 
     bars = alt.Chart(df).mark_bar(size=20).encode(
-    x=alt.X("GAME_DATE:T", title="Game Date", axis=alt.Axis(grid=False)),
-    y=alt.Y(stat, title=stat, scale=alt.Scale(domain=[0, y_max], nice=False), axis=alt.Axis(grid=False)),
-    color=alt.condition(
-        alt.datum.OverLine,
-        alt.value("green"),
-        alt.value("red")
-    ),
-    tooltip=["GAME_DATE", stat]
-)
+        x=alt.X("GAME_DATE:T", title="Game Date", axis=alt.Axis(grid=False)),
+        y=alt.Y(stat, title=stat, scale=alt.Scale(domain=[0, y_max], nice=False), axis=alt.Axis(grid=False)),
+        color=alt.condition(
+            alt.datum.OverLine,
+            alt.value("green"),
+            alt.value("red")
+        ),
+        tooltip=["GAME_DATE:T", "MIN:Q", stat]  # 👈 Shows minutes and stat on hover
+    )
+
 
     line = alt.Chart(pd.DataFrame({stat: [line_value]})).mark_rule(
         color="red", strokeDash=[4, 4]
@@ -311,4 +312,5 @@ if st.button("Run Analysis"):
 
                 df["GAME_DATE"] = df["GAME_DATE"].dt.date
                 st.markdown(f"### {name}")
+
                 st.altair_chart(stat_chart(df, "PTS", prop_line1), use_container_width=True)

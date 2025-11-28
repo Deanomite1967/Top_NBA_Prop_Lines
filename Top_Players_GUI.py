@@ -113,6 +113,7 @@ def extract_name(raw):
     name_only = re.sub(r"\b(Jr|Sr|III|IV)\.$", r"\1", name_only)
     return name_only
 
+
 def stat_chart(df, stat, line_value):
     df["OverLine"] = df[stat] > line_value
     max_val = df[stat].max()
@@ -171,7 +172,15 @@ def stat_chart(df, stat, line_value):
 
     return chart
 
-
+def prob_to_american_odds(prob):
+    if prob <= 0:
+        return 1000  # impossible event
+    if prob >= 1:
+        return -1000  # cap for certainty
+    if prob > 0.5:
+        return round(- (prob / (1 - prob)) * 100)
+    else:
+        return round(((1 - prob) / prob) * 100)
 
 # --- Main Analysis ---
 def run_analysis(opponent_abbr):
@@ -258,8 +267,10 @@ def run_analysis(opponent_abbr):
 
                 for line in [prop_line1, prop_line2, prop_line3]:
                     try:
-                        pct = (df["PTS"] > line).sum() / len(df) * 100
-                        score = (pct * 0.6) + (multiplier * 100 * 0.2) + (avg_fppm * 100 * 0.2)
+                        pct = (df["PTS"] >= line).sum() / len(df) * 100
+
+                        prob = pct / 100.0
+                        american_odds = prob_to_american_odds(prob)
 
                         results.append({
                             "Player": name,
@@ -267,7 +278,7 @@ def run_analysis(opponent_abbr):
                             "PctOver": round(pct, 1),
                             "FPPM": round(avg_fppm, 2),
                             "MatchupMultiplier": round(multiplier, 2),
-                            "Score": round(score, 2)
+                            "Implied Odds": american_odds
                         })
 
                         chart_data.append({
@@ -275,6 +286,8 @@ def run_analysis(opponent_abbr):
                             "Line": line,
                             "PctOver": round(pct, 1)
                         })
+
+
                     except Exception as e:
                         print(f"Error processing {name} at line {line}: {e}")
                         continue
@@ -284,18 +297,20 @@ def run_analysis(opponent_abbr):
                 continue
 
         return pd.DataFrame(results), pd.DataFrame(chart_data)
-    
+
+import altair as alt
+
 if st.button("Run Analysis"):
     df_results, df_chart = run_analysis(opponent_abbr)
 
     if df_results.empty:
         st.warning("No valid player data found.")
     else:
-        st.subheader("Top Starters by Composite Score (All Prop Lines)")
+        st.subheader("Top Starters by Implied Odds (All Prop Lines)")
         for line in [prop_line1, prop_line2, prop_line3]:
-            top_10 = df_results[df_results["Line"] == line].sort_values("Score", ascending=False).head(10)
+            top_10 = df_results[df_results["Line"] == line].sort_values("Implied Odds", ascending=True).head(10)
             st.markdown(f"### 🔹 {line} Points")
-            st.dataframe(top_10[["Player", "PctOver", "FPPM", "MatchupMultiplier", "Score"]])
+            st.dataframe(top_10[["Player", "PctOver", "FPPM", "MatchupMultiplier", "Implied Odds"]])
 
         if not df_chart.empty:
             
@@ -312,5 +327,5 @@ if st.button("Run Analysis"):
 
                 df["GAME_DATE"] = df["GAME_DATE"].dt.date
                 st.markdown(f"### {name}")
-
                 st.altair_chart(stat_chart(df, "PTS", prop_line1), use_container_width=True)
+
